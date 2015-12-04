@@ -31,6 +31,7 @@ class OMVRpcServiceOmvExtrasOrg extends OMVRpcServiceAbstract
 {
 
     private static $commands = array("aptclean","installbackports","installheaders");
+    private $hostArch = 'i386';
 
     public function getName()
     {
@@ -104,6 +105,8 @@ class OMVRpcServiceOmvExtrasOrg extends OMVRpcServiceAbstract
 
     public function initialize()
     {
+        $this->getHostArch();
+
         $this->registerMethod("getRepo");
         $this->registerMethod("setRepo");
         $this->registerMethod("getArch");
@@ -138,6 +141,14 @@ class OMVRpcServiceOmvExtrasOrg extends OMVRpcServiceAbstract
         $this->registerMethod("getRootFolders");
     }
 
+    private function getHostArch() {
+        $cmd = "export LANG=C; dpkg --print-architecture";
+        OMVUtil::exec($cmd, $output, $result);
+        if ($result !== 0)
+            return FALSE;
+        $this->hostArch = $output[0];
+    }
+
     public function getRepo($params, $context)
     {
         global $xmlConfig;
@@ -163,224 +174,273 @@ class OMVRpcServiceOmvExtrasOrg extends OMVRpcServiceAbstract
         unset($object['modules']);
         unset($object['resetperms']);
 
-        // Get architecture
-        // arch values
-        // 0 - armel
-        // 1 - armv6l armhf
-        // 2 - armv7l armhf
-        // 3 - i386
-        // 4 - amd64
-        $arch = 0;
-
-        $uname = php_uname();
-
-        if ( strpos($uname, "armv6l") !== false  )
-        {
-            $arch = 1;
-        }
-        elseif ( strpos($uname, "armv7l") !== false )
-        {
-            $arch = 2;
-        }
-        elseif ( strpos($uname, "486") !== false || strpos($uname, "686") !== false )
-        {
-            $arch = 3;
-        }
-        elseif ( strpos($uname, "amd64") !== false  )
-        {
-            $arch = 4;
-        }
-
-        // Create repo array
-        $result = array();
-
-        $result[] = array(
-            "id"          => "btsync",
-            "type"        => gettext("Backup"),
-            "enable"      => $object['btsync'],
-            "repo"        => gettext("BTSync"),
-            "description" => gettext("BTSync repository")
-        );
-
-        // must be amd64
-        if ( $arch > 3 )
-        {
-            $result[] = array(
+        // Define repos
+        $repos = [
+            [
+                "id"          => "enable",
+                "type"        => gettext("All"),
+                "enable"      => $object['enable'],
+                "repo"        => gettext("OMV-Extras.org"),
+                "description" => gettext("Main package repository"),
+                "archs"       => [
+                    "armel"     => true,
+                    "armhf"     => true,
+                    "powerpc"   => true,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
+                "id"          => "testing",
+                "type"        => gettext("All"),
+                "enable"      => $object['testing'],
+                "repo"        => gettext("OMV-Extras.org Testing"),
+                "description" => gettext("Release candidates"),
+                "archs"       => [
+                    "armel"     => true,
+                    "armhf"     => true,
+                    "powerpc"   => true,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
+                "id"          => "btsync",
+                "type"        => gettext("Backup"),
+                "enable"      => $object['btsync'],
+                "repo"        => gettext("BTSync"),
+                "description" => gettext("BTSync repository"),
+                "archs"       => [
+                    "armel"     => true,
+                    "armhf"     => true,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
+                "id"          => "greyhole",
+                "type"        => gettext("Filesystems"),
+                "enable"      => $object['greyhole'],
+                "repo"        => gettext("Greyhole"),
+                "description" => gettext("Greyhole repository"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => true,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
+                "id"          => "miller",
+                "type"        => gettext("Downloaders"),
+                "enable"      => $object['miller'],
+                "repo"        => gettext("Download Managers"),
+                "description" => gettext("Download managers for newsgroups, torrents, usenet, and streaming"),
+                "archs"       => [
+                    "armel"     => true,
+                    "armhf"     => true,
+                    "powerpc"   => true,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
+                "id"          => "millertesting",
+                "type"        => gettext("Downloaders"),
+                "enable"      => $object['millertesting'],
+                "repo"        => gettext("Download Managers Testing"),
+                "description" => gettext("Testing repository for download managers"),
+                "archs"       => [
+                    "armel"     => true,
+                    "armhf"     => true,
+                    "powerpc"   => true,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "gluster",
                 "type"        => gettext("Filesystems"),
                 "enable"      => $object['gluster'],
                 "repo"        => gettext("GlusterFS"),
-                "description" => gettext("Do not enable this repository unless you are using the GlusterFS filesystem (uncommon)")
-            );
-        }
-
-        $result[] = array(
-            "id"          => "greyhole",
-            "type"        => gettext("Filesystems"),
-            "enable"      => $object['greyhole'],
-            "repo"        => gettext("Greyhole"),
-            "description" => gettext("Greyhole repository")
-        );
-
-        // no arm arches
-        if ( $arch > 2 )
-        {
-            $result[] = array(
+                "description" => gettext("Do not enable this repository unless you are using the GlusterFS filesystem (uncommon)"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => false,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "hwraid",
                 "type"        => gettext("Utilities"),
                 "enable"      => $object['hwraid'],
                 "repo"        => gettext("HWRaid"),
-                "description" => gettext("Modules for different hardware raid controllers")
-            );
-        }
-
-        $result[] = array(
-            "id"          => "miller",
-            "type"        => gettext("Downloaders"),
-            "enable"      => $object['miller'],
-            "repo"        => gettext("Download Managers"),
-            "description" => gettext("Download managers for newsgroups, torrents, usenet, and streaming")
-        );
-
-        $result[] = array(
-            "id"          => "millertesting",
-            "type"        => gettext("Downloaders"),
-            "enable"      => $object['millertesting'],
-            "repo"        => gettext("Download Managers Testing"),
-            "description" => gettext("Testing repository for download managers")
-        );
-
-        // no armel
-        if ( $arch > 0 )
-        {
-            $result[] = array(
+                "description" => gettext("Modules for different hardware raid controllers"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "mono",
                 "type"        => gettext("Multimedia"),
                 "enable"      => $object['mono'],
                 "repo"        => gettext("Mono"),
-                "description" => gettext("Mono and mono-project.com")
-            );
-
-            $result[] = array(
+                "description" => gettext("Mono and mono-project.com"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => true,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "monotesting",
                 "type"        => gettext("Multimedia"),
                 "enable"      => $object['monotesting'],
                 "repo"        => gettext("Mono Testing"),
-                "description" => gettext("Testing repository for Mono")
-            );
-        }
-
-        // no arm arches
-        if ( $arch > 2 )
-        {
-            $result[] = array(
+                "description" => gettext("Testing repository for Mono"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => true,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "docker",
                 "type"        => gettext("Virtualization"),
                 "enable"      => $object['docker'],
                 "repo"        => gettext("Docker"),
-                "description" => gettext("Docker repository")
-            );
-
-            $result[] = array(
+                "description" => gettext("Docker repository"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "dockertesting",
                 "type"        => gettext("Virtualization"),
                 "enable"      => $object['dockertesting'],
                 "repo"        => gettext("Docker Testing"),
-                "description" => gettext("Testing repository for Docker")
-            );
-        }
-
-        $result[] = array(
-            "id"          => "enable",
-            "type"        => gettext("All"),
-            "enable"      => $object['enable'],
-            "repo"        => gettext("OMV-Extras.org"),
-            "description" => gettext("Main package repository")
-        );
-
-        $result[] = array(
-            "id"          => "testing",
-            "type"        => gettext("All"),
-            "enable"      => $object['testing'],
-            "repo"        => gettext("OMV-Extras.org Testing"),
-            "description" => gettext("Release candidates")
-        );
-
-        // no armel or armv6l
-        if ( $arch > 1 )
-        {
-            $result[] = array(
+                "description" => gettext("Testing repository for Docker"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "plex",
                 "type"        => gettext("Multimedia"),
                 "enable"      => $object['plex'],
                 "repo"        => gettext("Plex"),
-                "description" => gettext("Plex Media Server repository")
-            );
-        }
-
-        // no arm arches
-        if ( $arch > 2 )
-        {
-            $result[] = array(
+                "description" => gettext("Plex Media Server repository"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => true,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "vbox",
                 "type"        => gettext("Virtualization"),
                 "enable"      => $object['vbox'],
                 "repo"        => gettext("Virtualbox"),
-                "description" => gettext("Virtualbox repository")
-            );
-        }
-
-        // no armel
-        if ( $arch > 0 )
-        {
-            $result[] = array(
+                "description" => gettext("Virtualbox repository"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "vdr",
                 "type"        => gettext("Multimedia"),
                 "enable"      => $object['vdr'],
                 "repo"        => gettext("VDR"),
-                "description" => gettext("e-tobi.net repository")
-            );
-
-            $result[] = array(
+                "description" => gettext("e-tobi.net repository"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "vpn",
                 "type"        => gettext("Remote"),
                 "enable"      => $object['vpn'],
                 "repo"        => gettext("VPN"),
-                "description" => gettext("Plugins for setting up virtual private networks")
-            );
-        }
-
-        // amd64 only
-        if ( $arch > 3 )
-        {
-            $result[] = array(
+                "description" => gettext("Plugins for setting up virtual private networks"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => true,
+                    "powerpc"   => false,
+                    "i386"      => true,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "zfs",
                 "type"        => gettext("Filesystems"),
                 "enable"      => $object['zfs'],
                 "repo"        => gettext("ZFS"),
-                "description" => gettext("Do not enable this repository unless you are using the ZFS filesystem (uncommon)")
-            );
-
-            $result[] = array(
+                "description" => gettext("Do not enable this repository unless you are using the ZFS filesystem (uncommon)"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => false,
+                    "amd64"     => true
+                ]
+            ],[
                 "id"          => "zfstesting",
                 "type"        => gettext("Filesystems"),
                 "enable"      => $object['zfstesting'],
                 "repo"        => gettext("ZFS Testing"),
-                "description" => gettext("Do not enable this testing repository unless you are using the ZFS filesystem (uncommon)")
-            );
-        }
+                "description" => gettext("Do not enable this testing repository unless you are using the ZFS filesystem (uncommon)"),
+                "archs"       => [
+                    "armel"     => false,
+                    "armhf"     => false,
+                    "powerpc"   => false,
+                    "i386"      => false,
+                    "amd64"     => true
+                ]
+            ]
+        ];
 
-        if ( $object['developer'] == "0827" )
-        {
-            $result[] = array(
-                "id"          => "beta",
-                "type"        => gettext("All"),
-                "enable"      => $object['beta'],
-                "repo"        => gettext("Beta"),
-                "description" => gettext("Beta repository")
-            );
-        }
+        $betaRepos = [
+            // $object['developer'] == "0827"
+            "id"          => "beta",
+            "type"        => gettext("All"),
+            "enable"      => $object['beta'],
+            "repo"        => gettext("Beta"),
+            "description" => gettext("Beta repository"),
+            "archs"       => [
+                "armel"     => true,
+                "armhf"     => true,
+                "powerpc"   => false,
+                "i386"      => true,
+                "amd64"     => true
+            ]
+        ];
 
+        // Filter repo array for architecture
+        $result = array_filter($repos, function($r) {
+            return ($r['archs'][$this->hostArch] === TRUE);
+        });
+
+        // Add the beta repo(s) for developers
+        if ($object['developer'] == "0827")
+            array_push($result, $betaRepos);
+
+        $this->debug("Repos enabled: ".print_r(array_map(function($r) {
+            return $r['id'];
+        }, $result), TRUE));
         return $result;
     }
 
@@ -496,10 +556,7 @@ class OMVRpcServiceOmvExtrasOrg extends OMVRpcServiceAbstract
         );
 
         // Get architecture
-        $output = array();
-        $cmd = "export LANG=C; dpkg --print-architecture";
-        OMVUtil::exec($cmd, $output, $result);
-        $object['arch'] = strtolower( $output[0] );
+        $object['arch'] = strtolower( $this->hostArch );
 
         return $object;
     }
@@ -1030,10 +1087,7 @@ class OMVRpcServiceOmvExtrasOrg extends OMVRpcServiceAbstract
         $object['kernel'] = php_uname('r');
 
         // Get architecture
-        $output = array();
-        $cmd = "export LANG=C; dpkg --print-architecture";
-        OMVUtil::exec($cmd, $output, $result);
-        $object['arch'] = strtolower( $output[0] );
+        $object['arch'] = strtolower( $this->hostArch );
 
         // Remove useless fields from the result object.
         unset($object['repos']);
