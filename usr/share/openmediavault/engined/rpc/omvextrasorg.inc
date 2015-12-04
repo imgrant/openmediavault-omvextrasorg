@@ -483,14 +483,6 @@ class OMVRpcServiceOmvExtrasOrg extends OMVRpcServiceAbstract
         if ( boolval($repos['zfstesting']) === true )
             $repos['zfs'] = true;
 
-        $uname = php_uname();
-        if ( strpos($uname, "amd64") === false )
-        {
-            $repos['zfs'] = false;
-            $repos['zfstesting'] = false;
-            $repos['gluster'] = false;
-        }
-
         // Get the existing configuration object.
         $oldObject = $xmlConfig->get( $this->getXPath() );
         if (is_null($oldObject))
